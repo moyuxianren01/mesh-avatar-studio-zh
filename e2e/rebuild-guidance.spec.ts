@@ -22,9 +22,9 @@ test('sample copy preserves edits and undo, protects the original and enables a 
     const field = await editHead(page), banner = page.getByTestId('stale-banner');
     await expect(banner).toContainText('The sample is read-only');
     await expect(banner.getByRole('button', { name: 'Save and rebuild layers', exact: true })).toHaveCount(0);
-    await page.getByRole('button', { name: '日本語', exact: true }).click();
-    await expect(banner).toContainText('読み取り専用のため');
-    await page.screenshot({ path: 'docs/screenshots/ui7-sample-guidance-ja-1440x900.png' });
+    await page.getByRole('button', { name: '中文', exact: true }).click();
+    await expect(banner).toContainText('只读项目');
+    await page.screenshot({ path: 'docs/screenshots/ui7-sample-guidance-zh-1440x900.png' });
     let release!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; });
     await page.route('**/__studio/copy-sample', async route => { await gate; await route.fulfill({ status: 500, contentType: 'application/json', body: '{}' }); });
@@ -63,9 +63,9 @@ test('a picked folder can reopen a matching listed project without discarding ed
     const field = await editHead(page), banner = page.getByTestId('stale-banner');
     await expect(banner).toContainText('This project is available in the project list.');
     await expect(banner).toContainText('browser cannot identify this folder');
-    await page.getByRole('button', { name: '日本語', exact: true }).click();
-    await expect(banner).toContainText('このプロジェクトは一覧から開けます');
-    await page.screenshot({ path: 'docs/screenshots/ui7-picked-guidance-ja-1440x900.png' });
+    await page.getByRole('button', { name: '中文', exact: true }).click();
+    await expect(banner).toContainText('这个项目可以在列表中打开');
+    await page.screenshot({ path: 'docs/screenshots/ui7-picked-guidance-zh-1440x900.png' });
     await banner.getByRole('button', { name: '一覧から開き直す', exact: true }).click();
     await expect(banner.getByRole('button', { name: '保存してレイヤーを作り直す', exact: true })).toBeEnabled();
     await expect(field).toHaveValue('635'); await expect(page.getByTestId('preview-status')).toHaveAttribute('data-state', 'ready');
@@ -84,6 +84,6 @@ test('unmatched picked folders retain a short manual instruction and explain why
   await editHead(page); const banner = page.getByTestId('stale-banner');
   await expect(banner).toContainText('browser cannot identify this folder'); await expect(banner).toContainText('run build-layers');
   await expect(banner.getByRole('button')).toHaveCount(0);
-  await page.getByRole('button', { name: '日本語', exact: true }).click();
-  await expect(banner).toContainText('場所を取得できないため'); await expect(banner).toContainText('そのフォルダで build-layers');
+  await page.getByRole('button', { name: '中文', exact: true }).click();
+  await expect(banner).toContainText('无法获取'); await expect(banner).toContainText('在该文件夹运行 build-layers');
 });

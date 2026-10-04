@@ -1,9 +1,9 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { readPreference, savePreference } from './preferences';
-import { workflowEn, workflowJa } from './workflow-i18n';
+import { workflowEn, workflowZh } from './workflow-i18n';
 export { readPreference, savePreference } from './preferences';
 
-export type Language = 'en' | 'ja';
+export type Language = 'en' | 'zh';
 export const LANGUAGE_KEY = 'mesh-avatar-language';
 export const GUIDE_KEY = 'mesh-avatar-guide-seen';
 
@@ -19,7 +19,7 @@ const en = {
   drawnVariants: 'Drawn eyes/mouths', readOnly: 'Read-only', copyPath: 'Copy path', copyFolderPath: 'Copy folder path', copied: 'Path copied',
   showFinder: 'Show in Finder', showFolder: 'Open folder', unknownPath: 'Browser-picked project · full path unavailable',
   savedTo: 'Saved to', saveError: 'Could not save the project. Your edits are still in the editor; try again.', revealError: 'Could not open the project folder.', copyError: 'Could not copy the path.',
-  help: 'Help', close: 'Close help', language: 'Language', english: 'English', japanese: '日本語', enCode: 'EN', jaCode: 'JA',
+  help: 'Help', close: 'Close help', language: 'Language', english: 'English', chinese: 'Chinese', enCode: 'EN', zhCode: 'ZH',
   parts: 'Parts', faceSection: 'Face', hairSection: 'Hair & accessories', bodySection: 'Body', advanced: 'Advanced',
   notPresent: 'Not in this rig', show: 'Show overlay', hide: 'Hide overlay', showAll: 'Show all', hideAll: 'Hide all',
   source: 'Source & rig', canvas: 'Rig editor canvas', fit: 'Fit', zoom: 'Zoom', zoomOut: 'Zoom out', zoomIn: 'Zoom in', actualSize: 'Reset to 100%', fitPart: 'Fit selected part', wheelMode: 'Mouse wheel', wheelAuto: 'Zoom', wheelPan: 'Scroll to pan',
@@ -47,47 +47,47 @@ const en = {
   invalidValue: 'Check the values at these field paths:', point: 'point', node: 'node', strand: 'Strand', eye: 'Eye',
   accessory: 'Accessory', x: 'X', y: 'Y', px: 'px',
 };
-const ja: typeof en = {
-  ...workflowJa,
-  product: 'Mesh Avatar Studio', subtitle: 'イラストの動く範囲を調整',
-  tools: 'プロジェクト操作', openProject: 'プロジェクトを開く', openRig: 'rig.json だけ読み込む…', openFolder: 'プロジェクトフォルダを選ぶ…',
-  rigFile: '設定ファイルを開く', folderFiles: 'プロジェクトフォルダのファイルを開く', save: '設定を保存', undo: '元に戻す', redo: 'やり直す',
-  projectHelp: 'プロジェクトは、AI エージェントがイラストから作ったフォルダです(rig.json・source.png・built/ を含む)。',
-  recent: '最近開いたプロジェクト', noRecent: '履歴はまだありません。', clearHistory: '履歴を消去', removeRecent: '履歴から削除',
-  reopenLast: '起動時に最後のプロジェクトを開く', browseAgain: 'フォルダを選び直す', missingRecent: 'プロジェクトが見つからないため、履歴から削除しました:',
-  localProjects: 'ローカルのプロジェクト', noProjects: 'プロジェクトはまだありません。', sampleProject: 'サンプル', updated: '更新',
-  drawnVariants: '目・口の差分画像あり', readOnly: '読み取り専用', copyPath: 'パスをコピー', copyFolderPath: 'フォルダのパスをコピー', copied: 'パスをコピーしました',
-  showFinder: 'フォルダを開く', showFolder: 'フォルダを開く', unknownPath: 'ブラウザで選択 · フルパスは取得できません',
-  savedTo: '保存しました:', saveError: 'プロジェクトを保存できませんでした。編集内容は画面に残っています。もう一度お試しください。', revealError: 'プロジェクトのフォルダを開けませんでした。', copyError: 'パスをコピーできませんでした。',
-  help: 'ヘルプ', close: 'ヘルプを閉じる', language: '言語', english: '英語', japanese: '日本語', enCode: '英語', jaCode: '日本語',
-  parts: 'パーツ', faceSection: '顔', hairSection: '髪・飾り', bodySection: '体', advanced: '詳細設定',
-  notPresent: 'この設定にはありません', show: 'ガイドを表示', hide: 'ガイドを非表示', showAll: 'すべて表示', hideAll: 'すべて非表示',
-  source: '元画像と動く範囲', canvas: '動く範囲の編集キャンバス', fit: '全体表示', zoom: '表示倍率', zoomOut: '縮小', zoomIn: '拡大', actualSize: '100% に戻す', fitPart: '選択中のパーツに合わせる', wheelMode: 'マウスのホイール', wheelAuto: '拡大・縮小', wheelPan: 'スクロールで移動',
-  pickHint: '左のパーツか、画像の点を選んでください', dragHint: '点をドラッグして位置を調整',
-  lineHint: '点をドラッグ · 線をダブルクリックで点を追加 · ⌥＋点をクリックで削除',
-  panHint: 'ピンチで拡大・縮小 · スクロールや余白のドラッグで移動', noDots: '右の選択パーツ欄で数値を調整',
-  preview: '動きのプレビュー', idle: '待機中の動き', play: '待機中の動きを再生', pause: '待機中の動きを一時停止',
-  pose: 'ポーズ確認', reset: 'リセット', sweep: '角度を連続確認', stopSweep: '連続確認を停止',
-  lipSync: '口の動き', release: '解除', lipText: 'かなの文章', lipPlay: '再生', lipStop: '停止',
-  lipSpeed: '1秒あたりの拍数', lipLoop: '繰り返し', skippedKana: '読み飛ばす文字:', lipHelp: 'ひらがな・カタカナ・空白に対応。音声は再生しません。',
-  sweepTip: '頭を最大角度まで動かし、画像の隙間や破れを確認します',
-  turn: '顔を左右に向ける', look: '顔を上下に向ける', tilt: '頭を傾ける', eyeOpen: '目の開き', mouthOpen: '口の開き', bodyTilt: '体を傾ける',
-  loading: '画像を読み込み中…', updating: 'プレビューを更新中…', ready: 'プレビューの準備完了', previewError: 'プレビューを読み込めませんでした',
-  selection: '選択パーツ', selectedItem: '選択するパーツ', selectPart: 'パーツを選んで編集してください', tip: '調整のコツ',
-  guideTitle: '最初の編集は3ステップ', guide1: '左の一覧からパーツを選ぶ', guide2: '画像の点をドラッグする',
-  guide3: '右のプレビューで動きを見る', gotIt: 'わかりました', shortcuts: 'キーボード・マウス操作', guideAgain: '使い方をもう一度表示',
-  shortcutUndo: '元に戻す／やり直す', shortcutSave: '設定を保存', shortcutPan: '画像を移動', shortcutZoom: '画像を拡大・縮小',
-  shortcutVertex: '点を追加／削除', spaceDrag: 'スペース＋ドラッグ', wheel: 'スクロール', vertexKeys: '線をダブルクリック／⌥＋点をクリック',
-  stale: '輪郭が変更されました。プレビューには変更前の画像を使っています。',
-  changedParts: '変更されたパーツ', checking: 'サンプル画像を確認中…', emptyTitle: 'プロジェクトを開く',
-  emptyHelp: '「プロジェクトを開く」の一覧から選ぶか、フォルダを指定してください。',
-  newProjectHelp: '新しいイラストでは、エージェントに手順書に沿ってプロジェクトを作るよう依頼してください。',
-  invalidRig: '設定ファイルを開けませんでした。JSONの形式と次の項目を確認してください：',
-  invalidFolder: 'フォルダーを開けませんでした。source.png、rig.json、layers.json とすべての切り抜き画像を用意してください。',
-  invalidValue: '次の項目の数値を確認してください：', point: '点', node: '節点', strand: '髪の束', eye: '目',
-  accessory: '飾り', x: '横', y: '縦', px: '画素',
+const zh: typeof en = {
+  ...workflowZh,
+  product: 'Mesh Avatar Studio', subtitle: '调整插画的活动范围',
+  tools: '项目操作', openProject: '打开项目', openRig: '仅载入 rig.json…', openFolder: '选择项目文件夹…',
+  rigFile: '打开配置文件', folderFiles: '打开项目文件夹中的文件', save: '保存设置', undo: '撤销', redo: '重做',
+  projectHelp: '项目是 AI 智能体根据插画创建的文件夹（包含 rig.json、source.png、built/）。',
+  recent: '最近打开', noRecent: '暂无历史记录。', clearHistory: '清除历史', removeRecent: '从历史中删除',
+  reopenLast: '启动时打开上次的项目', browseAgain: '重新选择文件夹', missingRecent: '项目已不存在，已从历史中删除：',
+  localProjects: '本地项目', noProjects: '还没有项目。', sampleProject: '示例', updated: '更新',
+  drawnVariants: '眼・口手绘差分', readOnly: '只读', copyPath: '复制路径', copyFolderPath: '复制文件夹路径', copied: '路径已复制',
+  showFinder: '打开文件夹', showFolder: '打开文件夹', unknownPath: '浏览器选择 · 无法获取完整路径',
+  savedTo: '已保存：', saveError: '项目保存失败。编辑内容仍保留在界面中，请重试。', revealError: '无法打开项目文件夹。', copyError: '路径复制失败。',
+  help: '帮助', close: '关闭帮助', language: '语言', english: '英文', chinese: '中文', enCode: '英文', zhCode: '中文',
+  parts: '部件', faceSection: '脸部', hairSection: '头发・饰品', bodySection: '身体', advanced: '高级设置',
+  notPresent: '此配置中没有', show: '显示辅助线', hide: '隐藏辅助线', showAll: '全部显示', hideAll: '全部隐藏',
+  source: '原图与活动范围', canvas: '活动范围编辑画布', fit: '适应窗口', zoom: '缩放', zoomOut: '缩小', zoomIn: '放大', actualSize: '恢复 100%', fitPart: '定位到所选部件', wheelMode: '鼠标滚轮', wheelAuto: '缩放', wheelPan: '滚动平移',
+  pickHint: '在左侧选择部件，或点击图中的点', dragHint: '拖动点以调整位置',
+  lineHint: '拖动点 · 双击线条添加点 · ⌥+点击删除点',
+  panHint: '双指缩放 · 滚动或拖动空白处平移', noDots: '在右侧所选部件卡片中调整数值',
+  preview: '动作预览', idle: '待机动作', play: '播放待机动作', pause: '暂停待机动作',
+  pose: '姿态检查', reset: '重置', sweep: '连续扫角度', stopSweep: '停止连续检查',
+  lipSync: '口型', release: '解除', lipText: '假名文本', lipPlay: '播放', lipStop: '停止',
+  lipSpeed: '每秒拍数', lipLoop: '循环', skippedKana: '跳过的字符：', lipHelp: '支持平假名・片假名・空格。仅预览，无声音。',
+  sweepTip: '把头转到最大角度，检查图片的缝隙和破损',
+  turn: '左右转头', look: '上下转头', tilt: '歪头', eyeOpen: '眼睛开合', mouthOpen: '嘴开合', bodyTilt: '身体倾斜',
+  loading: '正在加载图片…', updating: '正在更新预览…', ready: '预览就绪', previewError: '预览加载失败',
+  selection: '所选部件', selectedItem: '选择部件', selectPart: '请选择部件进行编辑', tip: '调整技巧',
+  guideTitle: '三步完成第一次编辑', guide1: '在左侧列表中选择部件', guide2: '拖动图中的点',
+  guide3: '在右侧预览中查看动作', gotIt: '知道了', shortcuts: '键盘・鼠标操作', guideAgain: '再次显示使用说明',
+  shortcutUndo: '撤销／重做', shortcutSave: '保存设置', shortcutPan: '平移图片', shortcutZoom: '缩放图片',
+  shortcutVertex: '添加／删除点', spaceDrag: '空格＋拖动', wheel: '滚轮', vertexKeys: '双击线条／⌥+点击点',
+  stale: '轮廓已更改。预览仍使用更改前的图层。',
+  changedParts: '已更改的部件', checking: '正在检查示例图片…', emptyTitle: '打开项目',
+  emptyHelp: '从「打开项目」列表中选择，或指定文件夹。',
+  newProjectHelp: '要用新插画开始？请让智能体按操作指南准备项目。',
+  invalidRig: '配置文件打开失败。请检查 JSON 格式和以下字段：',
+  invalidFolder: '文件夹打开失败。请准备 source.png、rig.json、layers.json 和所有裁剪图。',
+  invalidValue: '请检查以下字段的数值：', point: '点', node: '节点', strand: '发束', eye: '眼睛',
+  accessory: '饰品', x: '横', y: '纵', px: '像素',
 };
-export const dictionaries = { en, ja };
+export const dictionaries = { en, zh };
 export type PartGroup = 'head' | 'eyes' | 'mouth' | 'face' | 'cheeks' | 'strands' | 'buns' | 'accessories' | 'body' | 'hand' | 'mesh' | 'view';
 const partText: Record<Language, Record<PartGroup, [string, string, string]>> = {
   en: {
@@ -104,43 +104,43 @@ const partText: Record<Language, Record<PartGroup, [string, string, string]>> = 
     mesh: ['Mesh', 'Mesh density.', 'Smaller cells add detail around the face but take more time to render.'],
     view: ['Framing', 'Preview margins.', 'Adjust the margins so the head and accessories stay inside the preview.'],
   },
-  ja: {
-    head: ['頭の向き', '顔を振ったり傾けたりするときに動く範囲。', '中心を顔の真ん中に置き、円が髪を含む頭全体を覆うように調整してください。'],
-    eyes: ['目', '目の開口部の輪郭。まばたきと視線に使う。', 'まつ毛の内側に沿って輪郭を置き、曲がる場所に点を追加してください。'],
-    mouth: ['口', '閉じた口の線と、口の形の差し替え範囲。', '線を閉じた口に合わせ、周囲の範囲を唇の近くに収めてください。'],
-    face: ['顔のパーツ', '鼻・耳・眉・あごの影響範囲。', '各範囲をパーツの中心に合わせ、大きさを調整して動きをなじませてください。'],
-    cheeks: ['頬', '頬の赤みが出る位置。', '左右の頬の、目より下に点を置いてください。'],
-    strands: ['髪の束', '物理演算で揺れる髪の線。', '根元から毛先へ線を置き、根元は頭皮の近くに合わせてください。'],
-    buns: ['お団子', 'まとまって揺れる範囲。', '顔を含めず、お団子を囲むように円を合わせてください。'],
-    accessories: ['飾り', '房飾りなどの振り子。', '付け根に支点を置き、いちばん下に先端を合わせてください。'],
-    body: ['体', '呼吸と体の揺れ。', '回転の支点を低い位置に置き、呼吸の範囲を胸に合わせてください。'],
-    hand: ['手', '手の輪郭と腕の関節。', '手の輪郭をなぞってから、手首と肘の位置を合わせてください。'],
-    mesh: ['メッシュ', 'メッシュの細かさ。', '格子を細かくすると顔の表現が細かくなりますが、描画の負荷が増えます。'],
-    view: ['表示範囲', 'プレビューの余白。', '頭や飾りがプレビューからはみ出さないように余白を調整してください。'],
+  zh: {
+    head: ['头的朝向', '转头或歪头时活动的范围。', '把中心放在脸部正中，圆圈覆盖含头发在内的整个头部。'],
+    eyes: ['眼睛', '眼睛开口的轮廓，用于眨眼和视线。', '沿睫毛内侧描出轮廓，在转折处加点。'],
+    mouth: ['嘴', '闭嘴时的线条与嘴型差分替换范围。', '让线条贴合闭着的嘴，周围范围收在嘴唇附近。'],
+    face: ['面部部件', '鼻・耳・眉・下巴的影响范围。', '把每个范围对准部件中心，调整大小让动作过渡自然。'],
+    cheeks: ['腮红', '腮红出现的位置。', '在左右脸颊、眼睛下方各放一个点。'],
+    strands: ['发束', '随物理摆动的发丝。', '从发根到发梢描线，发根贴近头皮。'],
+    buns: ['发髻', '整体晃动的范围。', '用圆圈圈住发髻，不要包含脸部。'],
+    accessories: ['饰品', '流苏等摆动部件。', '在系着的位置放支点，最下端放末梢。'],
+    body: ['身体', '呼吸与身体晃动。', '把旋转支点放低，呼吸范围对准胸部。'],
+    hand: ['手', '手的轮廓与手臂关节。', '先描出手的轮廓，再放好手腕和手肘的位置。'],
+    mesh: ['网格', '网格密度。', '格子越细脸部表现越精细，但绘制负担越大。'],
+    view: ['显示范围', '预览的边距。', '调整边距，让头和饰品不超出预览。'],
   },
 };
 const fieldText: Record<string, [string, string]> = {
-  image: ['Source image', '元画像'],
-  center: ['Centre', '中心'], pivot: ['Pivot', '支点'], rx: ['Horizontal radius', '横の半径'], ry: ['Vertical radius', '縦の半径'],
-  cx: ['Centre X', '中心の横位置'], cy: ['Centre Y', '中心の縦位置'], shiftX: ['Horizontal travel', '横の移動量'], shiftY: ['Vertical travel', '縦の移動量'],
-  pivotX: ['Pivot X', '支点の横位置'], pivotY: ['Pivot Y', '支点の縦位置'], maxRoll: ['Maximum tilt', '最大の傾き'],
-  weightBand: ['Head blend range', '頭の影響範囲'], turnBand: ['Turn blend range', '顔の向きの影響範囲'], breathBand: ['Breathing range', '呼吸の影響範囲'],
-  rollBand: ['Body tilt range', '体の傾きの影響範囲'], chest: ['Chest', '胸'], shoulders: ['Shoulders', '肩'],
-  nose: ['Nose', '鼻'], eyeA: ['First eye', '目の1番目'], eyeB: ['Second eye', '目の2番目'], earL: ['Left ear', '左耳'], earR: ['Right ear', '右耳'],
-  brow: ['Brows', '眉'], jaw: ['Jaw', 'あご'], band: ['Blend range', '影響範囲'], bunL: ['Left bun', '左のお団子'], bunR: ['Right bun', '右のお団子'],
-  opening: ['Opening', '開口部'], roi: ['Cut-out region', '切り抜き範囲'], x0: ['Left edge', '左端'], x1: ['Right edge', '右端'], y0: ['Top edge', '上端'], y1: ['Bottom edge', '下端'],
-  top: ['Upper lid curve', '上まぶたの曲線'], bot: ['Lower lid curve', '下まぶたの曲線'], angle: ['Angle', '角度'], halfLen: ['Half length', '長さの半分'],
-  bow: ['Curve depth', '曲線の深さ'], area: ['Drawing area', '差し替え範囲'], nodes: ['Nodes', '節点'], sigma: ['Sway width', '揺れの幅'],
-  k: ['Sway strength', '揺れの強さ'], max: ['Maximum sway', '最大の揺れ'], tip: ['Tip', '先端'], split: ['Joint split', '関節の分割位置'],
-  box: ['Cut-out box', '切り抜き枠'], color: ['Colour mask', '色のマスク'], redness: ['Red threshold', '赤の比率'], minRed: ['Minimum red', '赤の最小値'],
-  outline: ['Outline', '輪郭'], jawRange: ['Jaw range', 'あごの範囲'], background: ['Background patch', '背景の補完範囲'],
-  elbow: ['Elbow', '肘'], wrist: ['Wrist', '手首'], knuckle: ['Knuckle', '指の付け根'], contact: ['Contact point', '接点'],
-  forearmShare: ['Forearm movement', '前腕の移動割合'], armBand: ['Arm blend range', '腕の影響範囲'], wristBand: ['Wrist blend range', '手首の影響範囲'],
-  handBand: ['Hand blend range', '手の影響範囲'], fingerXBand: ['Finger horizontal range', '指の横範囲'], fingerYBand: ['Finger vertical range', '指の縦範囲'], pinBand: ['Pinned range', '固定範囲'],
-  baseCell: ['Base cell size', '全体の格子幅'], fine: ['Fine mesh region', '細かい格子の範囲'], cell: ['Cell size', '格子幅'],
-  handCell: ['Hand cell size', '手の格子幅'], tasselCell: ['Accessory cell size', '飾りの格子幅'], eyeBallCell: ['Iris cell size', '瞳の格子幅'],
-  eyeCell: ['Eye cell size', '目の格子幅'], spriteCell: ['Drawing cell size', '差し替え画像の格子幅'],
-  padTop: ['Top margin', '上の余白'], padSide: ['Side margin', '左右の余白'], gazeCenter: ['Gaze centre', '視線の中心'], start: ['Start', '始点'], end: ['End', '終点'],
+  image: ['Source image', '元图'],
+  center: ['Centre', '中心'], pivot: ['Pivot', '支点'], rx: ['Horizontal radius', '横向半径'], ry: ['Vertical radius', '纵向半径'],
+  cx: ['Centre X', '中心横坐标'], cy: ['Centre Y', '中心纵坐标'], shiftX: ['Horizontal travel', '横向移动量'], shiftY: ['Vertical travel', '纵向移动量'],
+  pivotX: ['Pivot X', '支点横坐标'], pivotY: ['Pivot Y', '支点纵坐标'], maxRoll: ['Maximum tilt', '最大倾斜'],
+  weightBand: ['Head blend range', '头部影响范围'], turnBand: ['Turn blend range', '转头影响范围'], breathBand: ['Breathing range', '呼吸影响范围'],
+  rollBand: ['Body tilt range', '身体倾斜范围'], chest: ['Chest', '胸'], shoulders: ['Shoulders', '肩'],
+  nose: ['Nose', '鼻'], eyeA: ['First eye', '第一只眼'], eyeB: ['Second eye', '第二只眼'], earL: ['Left ear', '左耳'], earR: ['Right ear', '右耳'],
+  brow: ['Brows', '眉'], jaw: ['Jaw', '下巴'], band: ['Blend range', '影响范围'], bunL: ['Left bun', '左发髻'], bunR: ['Right bun', '右发髻'],
+  opening: ['Opening', '开口'], roi: ['Cut-out region', '裁剪区'], x0: ['Left edge', '左端'], x1: ['Right edge', '右端'], y0: ['Top edge', '上端'], y1: ['Bottom edge', '下端'],
+  top: ['Upper lid curve', '上眼睑曲线'], bot: ['Lower lid curve', '下眼睑曲线'], angle: ['Angle', '角度'], halfLen: ['Half length', '半长'],
+  bow: ['Curve depth', '曲线深度'], area: ['Drawing area', '差分范围'], nodes: ['Nodes', '节点'], sigma: ['Sway width', '摆动宽度'],
+  k: ['Sway strength', '摆动强度'], max: ['Maximum sway', '最大摆动'], tip: ['Tip', '末梢'], split: ['Joint split', '关节分割位置'],
+  box: ['Cut-out box', '裁剪框'], color: ['Colour mask', '颜色遮罩'], redness: ['Red threshold', '红色阈值'], minRed: ['Minimum red', '红色最小值'],
+  outline: ['Outline', '轮廓'], jawRange: ['Jaw range', '下巴范围'], background: ['Background patch', '背景补全范围'],
+  elbow: ['Elbow', '手肘'], wrist: ['Wrist', '手腕'], knuckle: ['Knuckle', '指根'], contact: ['Contact point', '接触点'],
+  forearmShare: ['Forearm movement', '前臂移动比例'], armBand: ['Arm blend range', '手臂影响范围'], wristBand: ['Wrist blend range', '手腕影响范围'],
+  handBand: ['Hand blend range', '手部影响范围'], fingerXBand: ['Finger horizontal range', '手指横向范围'], fingerYBand: ['Finger vertical range', '手指纵向范围'], pinBand: ['Pinned range', '固定范围'],
+  baseCell: ['Base cell size', '基础格宽'], fine: ['Fine mesh region', '精细网格范围'], cell: ['Cell size', '格宽'],
+  handCell: ['Hand cell size', '手部格宽'], tasselCell: ['Accessory cell size', '饰品格宽'], eyeBallCell: ['Iris cell size', '瞳孔格宽'],
+  eyeCell: ['Eye cell size', '眼部格宽'], spriteCell: ['Drawing cell size', '差分图格宽'],
+  padTop: ['Top margin', '上边距'], padSide: ['Side margin', '左右边距'], gazeCenter: ['Gaze centre', '视线中心'], start: ['Start', '起点'], end: ['End', '终点'],
 };
 export function fieldTitle(path: string, language: Language) {
   const t = dictionaries[language];
@@ -158,7 +158,10 @@ export function fieldTitle(path: string, language: Language) {
 }
 const Context = createContext({ language: 'en' as Language, setLanguage: (_: Language) => { void _; } });
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguage] = useState<Language>(() => readPreference(LANGUAGE_KEY) === 'ja' ? 'ja' : 'en');
+  const [language, setLanguage] = useState<Language>(() => {
+    const saved = readPreference(LANGUAGE_KEY);
+    return saved === 'zh' || saved === 'ja' ? 'zh' : 'en';
+  });
   useEffect(() => { document.documentElement.lang = language; savePreference(LANGUAGE_KEY, language); }, [language]);
   return <Context.Provider value={{ language, setLanguage }}>{children}</Context.Provider>;
 }

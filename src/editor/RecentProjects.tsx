@@ -15,7 +15,7 @@ export function RecentProjects({ recent, projects, reopen, onOpen, onRemove, onC
       return <div key={entry.id} className="recent-row">
         <button data-testid={`recent-${entry.id}`} onClick={() => onOpen(entry)}>
           <strong>{entry.serverName === 'sample-miko-qipao' ? t.sampleProject : entry.name}</strong>
-          <small>{entry.relativePath} · {new Date(entry.lastOpened).toLocaleString(language === 'ja' ? 'ja-JP' : 'en-GB')}</small>
+          <small>{entry.relativePath} · {new Date(entry.lastOpened).toLocaleString(language === 'zh' ? 'zh-CN' : 'en-GB')}</small>
           {browse && <small>{t.browseAgain}</small>}
         </button><button className="remove-recent" aria-label={`${t.removeRecent} ${entry.name}`} onClick={() => onRemove(entry.id)}>×</button>
       </div>;

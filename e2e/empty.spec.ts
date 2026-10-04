@@ -14,7 +14,7 @@ test('missing sample images show an empty workspace with project opening control
   await expect(page.getByRole('button', { name: 'Browse for a project folder…', exact: true })).toBeEnabled();
   await expect(page.getByTestId('preview')).toHaveCount(0);
   await page.screenshot({ path: 'docs/screenshots/empty-workspace.png' });
-  await page.getByRole('button', { name: '日本語', exact: true }).click();
-  await expect(page.getByTestId('ask-agent-new')).toContainText('このリポジトリのフォルダで Codex を開いて');
-  await page.screenshot({ path: 'docs/screenshots/empty-workspace-ja.png' });
+  await page.getByRole('button', { name: '中文', exact: true }).click();
+  await expect(page.getByTestId('ask-agent-new')).toContainText('在这个仓库文件夹中打开 Codex');
+  await page.screenshot({ path: 'docs/screenshots/empty-workspace-zh.png' });
 });

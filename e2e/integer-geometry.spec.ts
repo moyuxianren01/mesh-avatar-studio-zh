@@ -71,9 +71,9 @@ test('rebuild errors explain the part and correction in both languages while ret
   await expect(feedback.getByRole('alert')).toContainText('Accessory 2 (tassel_r)');
   await expect(feedback.getByRole('alert')).toContainText('no width or height inside the image');
   await expect(feedback.getByRole('alert')).not.toContainText('build-layers:');
-  await page.getByRole('button', { name: '日本語', exact: true }).click();
-  await expect(feedback.getByRole('alert')).toContainText('飾り 2 (tassel_r) の切り抜き範囲に幅や高さがありません');
-  await feedback.getByText('ログを表示', { exact: true }).click(); await expect(feedback.locator('pre')).toHaveText(log);
+  await page.getByRole('button', { name: '中文', exact: true }).click();
+  await expect(feedback.getByRole('alert')).toContainText('饰品 2 (tassel_r) 的裁剪框没有宽或高');
+  await feedback.getByText('显示日志', { exact: true }).click(); await expect(feedback.locator('pre')).toHaveText(log);
   await page.unroute(`**/__studio/projects/${name}/rebuild`);
   const validation = 'Invalid rig: rig.accessories[1].box: rectangle must stay inside the image';
   await page.route(`**/__studio/projects/${name}/rebuild`, route => route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: validation }) }));
@@ -81,5 +81,5 @@ test('rebuild errors explain the part and correction in both languages while ret
   await expect(feedback.getByRole('alert')).toContainText('飾り 2 (tassel_r) の切り抜き範囲が画像の外');
   await expect(feedback.getByRole('alert')).not.toContainText('PNG');
   await feedback.locator('details').evaluate(element => { (element as HTMLDetailsElement).open = false; });
-  await page.screenshot({ path: 'docs/screenshots/ui8-rebuild-error-ja-1440x900.png' });
+  await page.screenshot({ path: 'docs/screenshots/ui8-rebuild-error-zh-1440x900.png' });
 });

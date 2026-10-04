@@ -39,12 +39,12 @@ test('paths stay hidden while copies keep full paths, folder buttons work and re
   await page.reload(); await expect(page.getByTestId('preview-status')).toHaveAttribute('data-state', 'ready');
   await page.getByTestId('variants-panel').getByRole('checkbox', { name: 'Mouth', exact: true }).check();
   await expect(card.getByRole('button', { name: 'Claude Code', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await page.getByRole('button', { name: '日本語', exact: true }).click();
-  await expect(card.getByRole('textbox')).toContainText('そこで止まってください'); await expect(card.locator('.agent-instruction')).toContainText('Claude Code');
+  await page.getByRole('button', { name: '中文', exact: true }).click();
+  await expect(card.getByRole('textbox')).toContainText('然后停下'); await expect(card.locator('.agent-instruction')).toContainText('Claude Code');
   await card.getByRole('button', { name: 'Codex', exact: true }).click();
   await expect(card.getByText('画像は Codex の画像生成に送られます', { exact: true })).toBeVisible();
   await expect(card.getByRole('textbox')).toContainText('ユーザーは Codex の画像生成の利用に同意済み');
-  await expect(card.locator('.agent-instruction')).toHaveText('このリポジトリのフォルダで Codex を開いて、次の文章を貼ってください。');
+  await expect(card.locator('.agent-instruction')).toHaveText('在这个仓库文件夹中打开 Codex、次の文章を貼ってください。');
   await card.getByRole('button', { name: 'フォルダのパスをコピー', exact: true }).click();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(resolve('.'));
   await expect(card.locator('.agent-folder-actions .copy-button')).toHaveText('✓ コピーしました');

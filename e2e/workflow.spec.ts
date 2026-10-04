@@ -172,21 +172,21 @@ test('external sprite updates load automatically while keeping edited outlines, 
   await page.screenshot({ path: 'docs/screenshots/ui4-auto-after-en-1440x900.png' });
   // Notices expire. Check Japanese on a new update, not by translating an old notice.
   await expect(page.locator('.save-notice')).toHaveCount(0, { timeout: 10000 });
-  await page.getByRole('button', { name: '日本語', exact: true }).click();
+  await page.getByRole('button', { name: '中文', exact: true }).click();
   const manifest = join(directory, 'built/sprites/sprites.json');
   await writeFile(manifest, await readFile(manifest));
-  await expect(page.getByRole('status').filter({ hasText: '描き分け画像を読み込みました' })).toBeVisible();
-  await page.screenshot({ path: 'docs/screenshots/ui4-auto-after-ja-1440x900.png' });
-  await page.getByRole('button', { name: '英語', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: '已加载手绘差分图' })).toBeVisible();
+  await page.screenshot({ path: 'docs/screenshots/ui4-auto-after-zh-1440x900.png' });
+  await page.getByRole('button', { name: '英文', exact: true }).click();
   await expect(point).toHaveValue('451'); await expect(page.getByTestId('stale-banner')).toBeVisible();
   await expect(page.getByTestId('editor')).toHaveAttribute('data-focus-group', 'eyes'); await expect(page.getByTestId('zoom-value')).toHaveText(zoomText!);
   await page.getByRole('button', { name: 'Undo', exact: true }).click(); await expect(point).toHaveValue('446');
 });
 test('pose and lip tabs keep a large preview at 1440 by 900 in both languages', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 }); await open(page);
-  for (const language of ['en', 'ja']) {
-    if (language === 'ja') await page.getByRole('button', { name: '日本語', exact: true }).click();
-    for (const tab of language === 'en' ? ['Pose test', 'Lip sync'] : ['ポーズ確認', '口の動き']) {
+  for (const language of ['en', 'zh']) {
+    if (language === 'zh') await page.getByRole('button', { name: '中文', exact: true }).click();
+    for (const tab of language === 'en' ? ['Pose test', 'Lip sync'] : ['姿态检查', '口型']) {
       await page.getByRole('tab', { name: tab, exact: true }).click();
       expect((await page.getByTestId('preview').boundingBox())!.height).toBeGreaterThanOrEqual(420);
       await expect(page.getByRole('tabpanel')).toHaveCount(1);

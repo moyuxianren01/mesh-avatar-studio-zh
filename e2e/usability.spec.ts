@@ -43,13 +43,13 @@ test('part selection focuses its overlay and visibility toggles do not select a 
 test('language switches labels and persists across reload', async ({ page }) => {
   test.skip(!samplePresent, sampleSkipReason);
   await openEditor(page);
-  await page.getByRole('button', { name: '日本語', exact: true }).click();
-  await expect(page.getByTestId('part-head')).toContainText('頭の向き');
-  await expect(page.getByText('ポーズ確認', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '中文', exact: true }).click();
+  await expect(page.getByTestId('part-head')).toContainText('头的朝向');
+  await expect(page.getByText('姿态检查', { exact: true })).toBeVisible();
   await page.reload();
-  await expect(page.getByTestId('part-head')).toContainText('頭の向き');
-  await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
-  await page.getByRole('button', { name: '英語', exact: true }).click();
+  await expect(page.getByTestId('part-head')).toContainText('头的朝向');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'zh');
+  await page.getByRole('button', { name: '英文', exact: true }).click();
   await expect(page.getByTestId('part-head')).toContainText('Head turn');
   await page.reload();
   await expect(page.getByTestId('part-head')).toContainText('Head turn');
@@ -78,7 +78,7 @@ test('blocked browser storage does not prevent editing or language changes', asy
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await openEditor(page);
-  await page.getByRole('button', { name: '日本語', exact: true }).click();
+  await page.getByRole('button', { name: '中文', exact: true }).click();
   await page.getByTestId('part-head').click();
   await expect(page.getByRole('spinbutton', { name: 'head.cx', exact: true })).toHaveValue('615');
   expect(errors).toEqual([]);
@@ -138,17 +138,17 @@ test('narrow layout moves the right column below the canvas and parts can be col
   await page.locator('.parts-disclosure > summary').click();
   await expect(page.getByTestId('part-head')).toBeVisible();
 });
-for (const [width, height] of [[1440, 900], [1280, 800]]) for (const language of ['en', 'ja']) {
+for (const [width, height] of [[1440, 900], [1280, 800]]) for (const language of ['en', 'zh']) {
   test(`desktop layout fits ${width}×${height} in ${language}`, async ({ page }) => {
     test.skip(!samplePresent, sampleSkipReason);
     await page.setViewportSize({ width, height });
     await openEditor(page);
-    if (language === 'ja') await page.getByRole('button', { name: '日本語', exact: true }).click();
+    if (language === 'zh') await page.getByRole('button', { name: '中文', exact: true }).click();
     await page.getByTestId('part-head').click();
     await page.getByTestId('idle-toggle').click();
     await expect(page.getByTestId('preview-status')).toHaveAttribute('data-state', 'ready');
     await expect(page.locator('.part-tip')).toBeVisible();
-    await expect(page.getByRole('tab', { name: language === 'ja' ? 'ポーズ確認' : 'Pose test', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('tab', { name: language === 'zh' ? '姿态检查' : 'Pose test', exact: true })).toHaveAttribute('aria-selected', 'true');
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     for (const selector of ['.parts-panel', '.editor-panel', '.preview-panel']) {
       const box = (await page.locator(selector).boundingBox())!;
@@ -162,8 +162,8 @@ for (const [width, height] of [[1440, 900], [1280, 800]]) for (const language of
     expect(pose.y + pose.height).toBeLessThanOrEqual(height);
     await expect(page.locator('.inspector select')).toHaveCount(0);
     const field = page.getByRole('spinbutton', { name: 'head.cx', exact: true });
-    await expect(field.locator('..').locator('span')).toHaveText(language === 'ja' ? '中心の横位置' : 'Centre X');
-    if (language === 'ja') {
+    await expect(field.locator('..').locator('span')).toHaveText(language === 'zh' ? '中心横坐标' : 'Centre X');
+    if (language === 'zh') {
       const english = await page.locator('main').evaluate(main => {
         const walker = document.createTreeWalker(main, NodeFilter.SHOW_TEXT);
         const found: string[] = [];
