@@ -39,6 +39,7 @@ summary::-webkit-details-marker { display: none; }
 .project-list { max-height: 320px; overflow: auto; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
 .project-list button { margin: 4px 0; background: #f5f7fb; }
 .project-list small { display: block; color: var(--muted); font-size: 11px; margin-top: 4px; overflow-wrap: anywhere; }
+.project-menu button.unreadable-project:disabled { opacity: 1; color: var(--muted); cursor: not-allowed; }
 .badge { display: inline-block; font-size: 10px; color: #395476; background: #edf3ff; border-radius: 4px; padding: 2px 4px; margin-left: 6px; }
 .recent-projects { padding: 8px; border-bottom: 1px solid var(--line); text-align: left; }
 .recent-heading { display: flex; align-items: center; justify-content: space-between; }

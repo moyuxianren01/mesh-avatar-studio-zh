@@ -6,7 +6,8 @@ import type { Rig } from '../rig/types';
 import { parseRig, validateRig } from '../rig/validate';
 import { Preview } from './Preview';
 import { RigHistory, downloadRig } from './history';
-import { openProjectFolder, openLocalProject, copySample, localProjects, projectAction, sampleImagesAvailable, repositoryContext, runProjectJob, ProjectJobError, type ProjectJob, type LocalProject } from './project';
+import { openProjectFolder, openLocalProject, copySample, localProjects, projectAction, sampleImagesAvailable, repositoryContext, runProjectJob, ProjectJobError, type ProjectJob, type LocalProject, type LocalProjectEntry } from './project';
+import { folderOpenError } from './folder-errors';
 import { layerSignature } from './stale';
 import { RigFields } from './RigFields';
 import { GROUPS } from './parts';
@@ -23,12 +24,12 @@ import { readRecent, addRecent, saveRecent, REOPEN_KEY, pickDirectory, hasDirect
   keepDirectory, restoreDirectory, forgetDirectory, clearDirectories, type RecentProject, type ProjectDirectory } from './recent-projects';
 import './style.css';
 
-type EditorError = { kind: 'invalidRig' | 'invalidFolder' | 'invalidValue' | 'saveError' | 'revealError' | 'copyError' | 'continueError'; paths: string[] };
+type EditorError = { kind: 'invalidRig' | 'invalidFolder' | 'missingFolderFiles' | 'unreadableFolder' | 'unreadableProject' | 'invalidValue' | 'saveError' | 'revealError' | 'copyError' | 'continueError'; paths: string[] };
 function errorPaths(value: string) { return [...new Set(value.match(/rig(?:\.[\w]+|\[\d+\])+/g) ?? [])]; }
 
 export function App() { return <I18nProvider><Workspace /></I18nProvider>; }
 function Workspace() {
-  const { t, parts, language, setLanguage, title } = useI18n();
+  const { t, parts, language, locale, setLanguage, title } = useI18n();
   const openMenu = useRef<HTMLDetailsElement>(null);
   const [guide, setGuide] = useState(() => readPreference(GUIDE_KEY) !== '1');
   const [help, setHelp] = useState(false);
@@ -41,7 +42,7 @@ function Workspace() {
   const objectUrls = useRef<string[]>([]);
   const [sourceUrl, setSourceUrl] = useState('');
   const [assets, setAssets] = useState<Record<string, string> | undefined>(undefined);
-  const [projects, setProjects] = useState<LocalProject[] | null>(null);
+  const [projects, setProjects] = useState<LocalProjectEntry[] | null>(null);
   const [localProject, setLocalProject] = useState<LocalProject | null>(null);
   const [pickedName, setPickedName] = useState('');
   const [notice, setNotice] = useState<{ key: 'savedTo' | 'missingRecent' | 'variantsReloaded' | 'reloadFailed'; path?: string } | null>(null);
@@ -80,7 +81,7 @@ function Workspace() {
       const latest = available[0];
       if (latest.kind === 'server') {
         const project = list?.find(item => item.name === latest.serverName);
-        if (project) { projectOpened.current = true; await openLocal(project, true); }
+        if (project && !project.error) { projectOpened.current = true; await openLocal(project, true); }
       } else if (latest.hasHandle) {
         const handle = await restoreDirectory(latest.id);
         if (!active || !handle) return;
@@ -160,10 +161,11 @@ function Workspace() {
       remember({ id, name, kind: 'folder', relativePath: name, lastOpened: new Date().toISOString(), hasHandle });
       if (openMenu.current) openMenu.current.open = false;
       return true;
-    } catch { setError({ kind: 'invalidFolder', paths: [] }); return false; }
+    } catch (error) { setError(folderOpenError(error)); return false; }
   };
-  const openLocal = async (entry: LocalProject, automatic = false) => {
+  const openLocal = async (entry: LocalProjectEntry, automatic = false) => {
     if (jobRef.current) return;
+    if (entry.error) { setError({ kind: 'unreadableProject', paths: [entry.error.code, entry.error.path] }); return; }
     setOpening(true);
     try {
       const project = await openLocalProject(entry);
@@ -226,7 +228,7 @@ function Workspace() {
     if (openMenu.current) openMenu.current.open = false;
     if (folder && hasDirectoryPicker()) {
       try { const handle = await pickDirectory(); await openFolder(await directoryFiles(handle), handle); }
-      catch (error) { if (!(error instanceof DOMException && error.name === 'AbortError')) setError({ kind: 'invalidFolder', paths: [] }); }
+      catch (error) { if (!(error instanceof DOMException && error.name === 'AbortError')) setError(folderOpenError(error)); }
     } else (folder ? folderInput : fileInput).current!.click();
   };
   const openRecent = async (entry: RecentProject) => {
@@ -246,6 +248,7 @@ function Workspace() {
           await openFolder(await directoryFiles(handle), handle); return;
         } catch (error) {
           if (error instanceof DOMException && error.name === 'NotFoundError') { removeRecent(entry.id); setNotice({ key: 'missingRecent', path: entry.name }); return; }
+          setError(folderOpenError(error)); return;
         }
       }
     }
@@ -257,7 +260,7 @@ function Workspace() {
     onReopen={value => { setReopen(value); savePreference(REOPEN_KEY, value ? '1' : '0'); }} />;
   const reloadInPlace = async (entry: LocalProject) => {
     const list = await localProjects(), fresh = list?.find(item => item.name === entry.name);
-    if (!fresh) throw new ProjectJobError('toolFailed', t.reloadFailed);
+    if (!fresh || fresh.error) throw new ProjectJobError('toolFailed', t.reloadFailed);
     const loaded = await openLocalProject(fresh);
     // Keep the canvas mounted, its view, selection and the existing undo/redo stack.
     history.replacePresent(loaded.rig!); setRig(history.present); setDragStale(null);
@@ -276,7 +279,7 @@ function Workspace() {
         if (!active || generation !== revision || jobRef.current) return;
         try {
           const list = await localProjects(), fresh = list?.find(item => item.name === entry.name);
-          if (!fresh) throw new Error('Project unavailable');
+          if (!fresh || fresh.error) throw new Error('Project unavailable');
           const loaded = await openLocalProject(fresh);
           if (!active || generation !== revision || jobRef.current) return;
           // Sprite changes must not discard unsaved outlines, selection, view or undo history.
@@ -306,14 +309,14 @@ function Workspace() {
     } finally { jobRef.current = null; setJob(null); }
   };
   const sampleEditing = !!localProject?.readOnly || (!localProject && !pickedName);
-  const listedProject = !localProject && pickedName ? projects?.find(project => !project.readOnly && project.name === pickedName && project.relativePath.startsWith('projects/')) : undefined;
+  const listedProject = !localProject && pickedName ? projects?.find(project => !project.error && !project.readOnly && project.name === pickedName && project.relativePath.startsWith('projects/')) : undefined;
   const continueEditing = async () => {
     if (jobRef.current || saving || opening) return;
     const edited = structuredClone(history.present), previousSignature = builtSignature;
     jobRef.current = 'transfer'; setOpening(true); setError(null);
     try {
       const entry = sampleEditing ? await copySample(edited) : listedProject;
-      if (!entry) throw new Error('Project unavailable');
+      if (!entry || entry.error) throw new Error('Project unavailable');
       const loaded = await openLocalProject(entry);
       // The copied layers still reflect the sample's original outlines, not the edited rig.
       setBuiltSignature(sampleEditing ? previousSignature : layerSignature(loaded.rig!));
@@ -340,10 +343,10 @@ function Workspace() {
           <div className="project-menu">{recentControl}<p className="project-help">{t.projectHelp}</p>
             {projects && <div className="project-list" aria-label={t.localProjects}>
               {projects.length === 0 && <p>{t.noProjects}</p>}
-              {projects.map(project => <button key={project.name} disabled={opening} data-testid={`project-${project.name}`} onClick={() => { void openLocal(project); }}>
+              {projects.map(project => <button key={project.name} className={project.error ? 'unreadable-project' : undefined} disabled={opening || !!project.error} data-testid={`project-${project.name}`} onClick={() => { void openLocal(project); }}>
                 <strong>{project.readOnly ? t.sampleProject : project.name}</strong><small>{project.relativePath}</small>
-                <small>{t.updated}: {new Date(project.updatedAt).toLocaleString(language === 'zh' ? 'zh-CN' : 'en-GB')}
-                  {project.hasSprites && <span className="badge">{t.drawnVariants}</span>}{project.readOnly && <span className="badge">{t.readOnly}</span>}</small>
+                <small>{project.error ? <>{t.unreadableProject} ({project.error.code}) · {project.error.path}</> : <>{t.updated}: {new Date(project.updatedAt).toLocaleString(locale)}
+                  {project.hasSprites && <span className="badge">{t.drawnVariants}</span>}{project.readOnly && <span className="badge">{t.readOnly}</span>}</>}</small>
               </button>)}
             </div>}
             <button onClick={() => { void chooseFile(true); }}>{t.openFolder}</button><button onClick={() => { void chooseFile(false); }}>{t.openRig}</button>

@@ -7,7 +7,7 @@ test('missing sample images show an empty workspace with project opening control
   });
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Open a project', exact: true })).toBeVisible();
-  await expect(page.getByText('Choose a project from Open project, or browse for its folder. Sample images are installed separately.')).toBeVisible();
+  await expect(page.getByText('Choose a project from Open project, or browse for its folder.')).toBeVisible();
   await expect(page.getByTestId('ask-agent-new')).toContainText('Open Codex in this repository folder');
   await page.locator('.open-menu > summary').click();
   await expect(page.getByRole('button', { name: 'Load rig.json only…', exact: true })).toBeEnabled();

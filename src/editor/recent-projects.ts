@@ -1,4 +1,5 @@
 import { readPreference, savePreference } from './preferences';
+import { FolderOpenError } from './folder-errors';
 
 export const RECENT_KEY = 'mesh-avatar-recent-projects';
 export const REOPEN_KEY = 'mesh-avatar-reopen-project';
@@ -36,22 +37,31 @@ export function pickDirectory(): Promise<ProjectDirectory> {
 }
 export async function directoryFiles(handle: ProjectDirectory): Promise<File[]> {
   const files: File[] = [];
+  const read = async (entry: FileSystemFileHandle, path: string) => {
+    try {
+      const file = await entry.getFile();
+      Object.defineProperty(file, 'webkitRelativePath', { value: path }); files.push(file);
+    } catch (error) {
+      throw new FolderOpenError(error instanceof DOMException && error.name === 'NotFoundError' ? 'missingFolderFiles' : 'unreadableFolder', [path]);
+    }
+  };
   async function walk(directory: ProjectDirectory, prefix: string) {
-    for await (const entry of directory.values()) {
-      const path = `${prefix}/${entry.name}`;
-      if (entry.kind === 'directory') await walk(entry as ProjectDirectory, path);
-      else {
-        const file = await (entry as FileSystemFileHandle).getFile();
-        Object.defineProperty(file, 'webkitRelativePath', { value: path }); files.push(file);
+    try {
+      for await (const entry of directory.values()) {
+        const path = `${prefix}/${entry.name}`;
+        if (entry.kind === 'directory') await walk(entry as ProjectDirectory, path);
+        else await read(entry as FileSystemFileHandle, path);
       }
+    } catch (error) {
+      if (error instanceof FolderOpenError) throw error;
+      throw new FolderOpenError('unreadableFolder', [prefix]);
     }
   }
   // Read only the files the editor uses, not scratch images or unrelated project documents.
   for await (const entry of handle.values()) {
     if (entry.kind === 'directory' && entry.name === 'built') await walk(entry as ProjectDirectory, `${handle.name}/built`);
     else if (entry.kind === 'file' && ['rig.json', 'source.png'].includes(entry.name)) {
-      const file = await (entry as FileSystemFileHandle).getFile();
-      Object.defineProperty(file, 'webkitRelativePath', { value: `${handle.name}/${entry.name}` }); files.push(file);
+      await read(entry as FileSystemFileHandle, `${handle.name}/${entry.name}`);
     }
   }
   return files;

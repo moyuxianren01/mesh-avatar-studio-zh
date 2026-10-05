@@ -43,7 +43,10 @@ const en = {
   emptyHelp: 'Choose a project from Open project, or browse for its folder.',
   newProjectHelp: 'Starting from a new illustration? Ask your agent to prepare a project using the agent guide.',
   invalidRig: 'Could not open the rig file. Check the JSON and these field paths:',
-  invalidFolder: 'Could not open this folder. Include source.png, rig.json, layers.json and every cut-out image.',
+  invalidFolder: 'Could not open this folder. Check rig.json and layers.json for invalid data.',
+  missingFolderFiles: 'Required files are missing. Include source.png, layers.json and every cut-out image.',
+  unreadableFolder: 'A file or folder could not be read. Check access permissions and whether another app is using it, then try again.',
+  unreadableProject: 'Cannot read this project. Check permissions or whether the file is in use.',
   invalidValue: 'Check the values at these field paths:', point: 'point', node: 'node', strand: 'Strand', eye: 'Eye',
   accessory: 'Accessory', x: 'X', y: 'Y', px: 'px',
 };
@@ -84,6 +87,9 @@ const zh: typeof en = {
   newProjectHelp: '要用新插画开始？请让智能体按操作指南准备项目。',
   invalidRig: '配置文件打开失败。请检查 JSON 格式和以下字段：',
   invalidFolder: '文件夹打开失败。请准备 source.png、rig.json、layers.json 和所有裁剪图。',
+  missingFolderFiles: '缺少必需文件。请确保包含 source.png、layers.json 和所有拆分图层图片。',
+  unreadableFolder: '无法读取文件或文件夹。请检查访问权限，或是否正被其他应用占用，然后重试。',
+  unreadableProject: '无法读取此项目。请检查访问权限，或文件是否正被占用。',
   invalidValue: '请检查以下字段的数值：', point: '点', node: '节点', strand: '发束', eye: '眼睛',
   accessory: '饰品', x: '横', y: '纵', px: '像素',
 };
@@ -162,11 +168,11 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     const saved = readPreference(LANGUAGE_KEY);
     return saved === 'zh' || saved === 'ja' ? 'zh' : 'en';
   });
-  useEffect(() => { document.documentElement.lang = language; savePreference(LANGUAGE_KEY, language); }, [language]);
+  useEffect(() => { document.documentElement.lang = language === 'zh' ? 'zh-CN' : language; savePreference(LANGUAGE_KEY, language); }, [language]);
   return <Context.Provider value={{ language, setLanguage }}>{children}</Context.Provider>;
 }
 export function useI18n() {
   const context = useContext(Context);
-  return { ...context, t: dictionaries[context.language], parts: partText[context.language],
+  return { ...context, t: dictionaries[context.language], parts: partText[context.language], locale: { en: 'en-GB', zh: 'zh-CN' }[context.language],
     title: (path: string) => fieldTitle(path, context.language) };
 }

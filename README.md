@@ -22,6 +22,17 @@ the bundled sample, Miko in a qipao. Pick a part on the left, drag its dots on t
 watch the preview on the right. The sample is read-only; when you change it, choose
 **Copy and keep editing** to continue in your own copy.
 
+### Using Windows
+
+Use `git clone` to download the repository when possible. If you use a ZIP, open its
+Properties in File Explorer and select **Unblock**, if shown, before extracting it.
+
+Create `projects/` yourself under your Windows account before asking an agent to work in it.
+Folders created by another account or an agent running in a sandbox can have permissions
+that prevent the editor from reading them. If a project cannot be read, use the folder's
+**Properties → Security** settings to grant your account access to the whole project,
+including its files and subfolders through permission inheritance.
+
 ## How it works
 
 Making an avatar from your own illustration takes four steps. Steps 1 and 4 are done by a

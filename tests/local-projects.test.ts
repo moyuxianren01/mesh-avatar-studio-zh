@@ -3,9 +3,23 @@ import { mkdtemp, mkdir, writeFile, readFile, rm, symlink } from 'node:fs/promis
 import { homedir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { Readable } from 'node:stream';
+import { EventEmitter } from 'node:events';
+import { createServer, resolveConfig, type ViteDevServer } from 'vite';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import fixture from '../samples/miko-qipao/rig.json';
 import { localProjectMiddleware, localProjectsPlugin } from '../src/server/local-projects';
+
+const failure = vi.hoisted(() => ({ operation: '', path: '', code: '' }));
+vi.mock('node:fs/promises', async importOriginal => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  const methods = ['realpath', 'stat', 'readdir', 'readFile'] as const;
+  return { ...actual, ...Object.fromEntries(methods.map(method => [method, async (...args: unknown[]) => {
+    if (failure.operation === method && String(args[0]) === failure.path) {
+      throw Object.assign(new Error(`Private filesystem details: ${failure.path}`), { code: failure.code, path: failure.path });
+    }
+    return Reflect.apply(actual[method], actual, args);
+  }])) };
+});
 
 let root: string;
 beforeEach(async () => {
@@ -19,7 +33,7 @@ beforeEach(async () => {
   }
   await writeFile(resolve(root, 'projects/nova/built/sprites/sprites.json'), '{}');
 });
-afterEach(async () => { await rm(root, { recursive: true, force: true }); });
+afterEach(async () => { failure.operation = ''; vi.useRealTimers(); await rm(root, { recursive: true, force: true }); });
 
 async function call(path: string, method = 'GET', body?: unknown, headers: Record<string, string> = {}, reveal = vi.fn(async (_path: string) => { void _path; })) {
   const request = Readable.from(body === undefined ? [] : [Buffer.from(JSON.stringify(body))]) as IncomingMessage;
@@ -94,6 +108,104 @@ test('plugin is development-only and has no production or preview middleware hoo
   const plugin = localProjectsPlugin(root);
   expect(plugin.apply).toBe('serve'); expect(plugin.configurePreviewServer).toBeUndefined();
 });
+
+for (const operation of ['realpath', 'stat']) for (const code of ['EPERM', 'EACCES', 'EBUSY']) {
+  test(`lists other projects and an unreadable entry when ${operation} fails with ${code}`, async () => {
+    Object.assign(failure, { operation, code, path: resolve(root, 'projects/nova') });
+    const response = await call('/__studio/projects');
+    expect(response.status).toBe(200);
+    const list = JSON.parse(response.body);
+    expect(list.find((entry: { name: string }) => entry.name === 'sample-miko-qipao')).toMatchObject({ readOnly: true, hasSprites: false });
+    const blocked = list.find((entry: { name: string }) => entry.name === 'nova');
+    expect(blocked).toEqual({ name: 'nova', relativePath: 'projects/nova', readOnly: false, error: { code, path: 'projects/nova' } });
+    expect(JSON.stringify(blocked)).not.toContain(root);
+  });
+}
+
+test('a nested file error or unreadable sample does not discard healthy projects', async () => {
+  Object.assign(failure, { operation: 'stat', code: 'EACCES', path: resolve(root, 'projects/nova/built/sprites/sprites.json') });
+  let list = JSON.parse((await call('/__studio/projects')).body);
+  expect(list.find((entry: { name: string }) => entry.name === 'nova').error.path).toBe('projects/nova/built/sprites/sprites.json');
+  failure.path = resolve(root, 'samples/miko-qipao/source.png');
+  list = JSON.parse((await call('/__studio/projects')).body);
+  expect(list.find((entry: { name: string }) => entry.name === 'nova').error).toBeUndefined();
+  expect(list.find((entry: { name: string }) => entry.name === 'sample-miko-qipao').error).toEqual({ code: 'EACCES', path: 'samples/miko-qipao/source.png' });
+});
+
+for (const [code, status] of [['EPERM', 403], ['EACCES', 403], ['EBUSY', 409], ['ENOENT', 404]] as const) {
+  test(`API maps ${code} to ${status} without disclosing absolute paths`, async () => {
+    Object.assign(failure, { operation: 'readFile', code, path: resolve(root, 'projects/nova/rig.json') });
+    const response = await call('/__studio/projects/nova/rig.json');
+    expect(response.status).toBe(status);
+    expect(JSON.parse(response.body)).toMatchObject({ code, path: 'projects/nova/rig.json' });
+    expect(response.body).not.toContain(root);
+    expect(response.body).not.toContain('Private filesystem details');
+  });
+}
+
+test('a denied projects directory returns a specific error instead of an empty list', async () => {
+  Object.assign(failure, { operation: 'readdir', code: 'EACCES', path: resolve(root, 'projects') });
+  const response = await call('/__studio/projects');
+  expect(response.status).toBe(403);
+  expect(JSON.parse(response.body)).toMatchObject({ code: 'EACCES', path: 'projects' });
+});
+
+test('errors outside the repository or without a path use a safe project-relative fallback', async () => {
+  for (const path of [undefined, resolve(root, '../outside-private-file'), 'C:\\Users\\private-account\\secret', '\\\\host\\private\\secret']) {
+    const reveal = vi.fn(async () => { throw Object.assign(new Error('private details'), { code: 'EACCES', path }); });
+    const response = await call('/__studio/projects/nova/reveal', 'POST', {}, {}, reveal);
+    expect(response.status).toBe(403);
+    expect(JSON.parse(response.body)).toEqual({ error: 'Permission denied (EACCES): projects/nova', code: 'EACCES', path: 'projects/nova' });
+  }
+});
+
+test('watch ignores hidden project paths while preserving existing exclusions and variant reloads after EBUSY', async () => {
+  const plugin = localProjectsPlugin(root);
+  const config = await resolveConfig({ configFile: false, root, plugins: [plugin], server: { watch: { ignored: ['**/existing-ignore/**'] } } }, 'serve');
+  const ignored = config.server.watch?.ignored as (string | ((path: string) => boolean))[];
+  expect(ignored).toContain('**/existing-ignore/**');
+  const excludes = ignored.find(value => typeof value === 'function') as (path: string) => boolean;
+  for (const path of ['projects/.studio-job-123', 'projects/.readme-tmp-123/built/base.png', 'projects/nova/variants/.scratch/image.png']) {
+    expect(excludes(resolve(root, path)), path).toBe(true);
+  }
+  for (const path of ['projects', 'projects/nova/variants/mouth_a.png', 'projects/nova/built/sprites/sprites.json', 'src/editor/App.tsx']) {
+    expect(excludes(resolve(root, path)), path).toBe(false);
+  }
+  vi.useFakeTimers();
+  const watcher = Object.assign(new EventEmitter(), { add: vi.fn() });
+  const send = vi.fn(), warn = vi.fn(), httpServer = new EventEmitter();
+  const configure = plugin.configureServer as (server: ViteDevServer) => void;
+  configure({ watcher, ws: { send }, config: { logger: { warn } }, middlewares: { use: vi.fn() }, httpServer } as unknown as ViteDevServer);
+  expect(() => watcher.emit('error', Object.assign(new Error('private detail'), { code: 'EBUSY', path: resolve(root, 'projects/.studio-job-123') }))).not.toThrow();
+  expect(warn).toHaveBeenCalledWith(expect.stringContaining('EBUSY'));
+  expect(warn.mock.calls[0][0]).not.toContain(root);
+  watcher.emit('all', 'change', resolve(root, 'projects/.studio-job-123/variants/mouth_a.png'));
+  watcher.emit('all', 'change', resolve(root, 'projects/nova/variants/mouth_a.png'));
+  watcher.emit('all', 'change', resolve(root, 'projects/nova/built/sprites/sprites.json'));
+  await vi.advanceTimersByTimeAsync(800);
+  expect(send).toHaveBeenCalledExactlyOnceWith({ type: 'custom', event: 'studio:variants-changed', data: { name: 'nova' } });
+  const response = await call('/__studio/projects'); expect(response.status).toBe(200);
+  watcher.emit('all', 'change', resolve(root, 'projects/nova/variants/mouth_a.png'));
+  httpServer.emit('close'); await vi.advanceTimersByTimeAsync(800);
+  expect(send).toHaveBeenCalledTimes(1);
+});
+
+test('the live watcher skips temporary directories and still detects new variants and sprite updates', async () => {
+  const stage = resolve(root, 'projects/.studio-job-123');
+  await mkdir(resolve(stage, 'built'), { recursive: true });
+  await writeFile(resolve(stage, 'built/base.png'), 'scratch');
+  const server = await createServer({ configFile: false, root, cacheDir: resolve(root, '.vite'), plugins: [localProjectsPlugin(root)], server: { middlewareMode: true, hmr: false } });
+  try {
+    await vi.waitFor(() => expect(server.watcher.getWatched()[resolve(root, 'projects/nova/variants')]).toBeDefined());
+    expect(Object.keys(server.watcher.getWatched()).some(path => path.includes('.studio-job-123'))).toBe(false);
+    const send = vi.spyOn(server.ws, 'send');
+    await writeFile(resolve(root, 'projects/nova/variants/mouth_a.png'), 'new variant');
+    await vi.waitFor(() => expect(send).toHaveBeenCalledWith({ type: 'custom', event: 'studio:variants-changed', data: { name: 'nova' } }), { timeout: 5000 });
+    send.mockClear();
+    await writeFile(resolve(root, 'projects/nova/built/sprites/sprites.json'), '{"layers":{}}');
+    await vi.waitFor(() => expect(send).toHaveBeenCalledWith({ type: 'custom', event: 'studio:variants-changed', data: { name: 'nova' } }), { timeout: 5000 });
+  } finally { await server.close(); }
+}, 15_000);
 
 
 test('sample copies reserve unused names, carry edits and built assets, and reject invalid or redirected sources', async () => {

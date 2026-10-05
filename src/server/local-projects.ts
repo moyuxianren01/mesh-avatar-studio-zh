@@ -2,17 +2,28 @@ import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
 import { readFile, readdir, realpath, stat, writeFile, rename, unlink, mkdir, cp, lstat, rm } from 'node:fs/promises';
-import { resolve, relative, extname, sep } from 'node:path';
+import { resolve, relative, extname, sep, isAbsolute } from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Plugin } from 'vite';
 import { validateRig } from '../rig/validate';
+import type { LocalProject, LocalProjectEntry } from '../project-types';
 import { decodeVariants, JobError, projectJob, runTool, variantState, VARIANTS, type Runner } from './project-jobs';
 
 const SAMPLE = 'sample-miko-qipao';
 const displayPath = (path: string) => path === homedir() ? '~' : path.startsWith(`${homedir()}${sep}`) ? `~${path.slice(homedir().length)}` : path;
 const safeName = /^[A-Za-z0-9._-]+$/;
 class HttpError extends Error { constructor(public status: number, message: string) { super(message); } }
-const inside = (base: string, path: string) => { const rel = relative(base, path); return rel === '' || (!rel.startsWith(`..${sep}`) && rel !== '..' && !rel.startsWith(sep)); };
+const inside = (base: string, path: string) => { const rel = relative(base, path); return rel === '' || (!rel.startsWith(`..${sep}`) && rel !== '..' && !isAbsolute(rel)); };
+function fileSystemError(root: string, error: unknown, fallback = 'projects') {
+  const failure = error as NodeJS.ErrnoException | null;
+  if (!failure?.code || !/^E[A-Z0-9]+$/.test(failure.code)) return;
+  const code = failure.code;
+  const path = typeof failure.path === 'string' && isAbsolute(failure.path) && inside(root, failure.path)
+    ? relative(root, failure.path).split(sep).join('/') || '.' : fallback;
+  const status = ['EPERM', 'EACCES', 'EROFS'].includes(code) ? 403 : code === 'EBUSY' ? 409 : ['ENOENT', 'ENOTDIR'].includes(code) ? 404 : 500;
+  const reason = status === 403 ? 'Permission denied' : status === 409 ? 'File or folder is in use' : status === 404 ? 'Project or file not found' : 'Local project operation failed';
+  return { status, body: { error: `${reason} (${code}): ${path}`, code, path } };
+}
 async function exists(path: string) { try { await stat(path); return true; } catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false; throw error; } }
 async function checked(base: string, path: string) {
   if (!inside(base, resolve(path)) || !inside(base, await realpath(path))) throw new HttpError(400, 'Path must stay inside the project.');
@@ -66,7 +77,7 @@ export function localProjectMiddleware(root: string, reveal = revealFolder, runn
     if (!(await stat(path)).isDirectory()) throw new HttpError(404, 'Project not found.');
     return path;
   }
-  async function info(name: string) {
+  async function info(name: string): Promise<LocalProject | null> {
     const path = await folder(name), rigPath = resolve(path, 'rig.json');
     const draft = resolve(path, 'rig.draft.json');
     if (!await exists(rigPath) && !(await exists(draft) && await exists(resolve(path, 'built')))) return null;
@@ -79,6 +90,7 @@ export function localProjectMiddleware(root: string, reveal = revealFolder, runn
   return async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
     if (!req.url?.startsWith('/__studio/')) { next(); return; }
     const json = (status: number, value: unknown) => { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }); res.end(JSON.stringify(value)); };
+    let errorPath = 'projects';
     try {
       // Reject cross-origin browser requests, including writes triggered by another website.
       if (req.headers.origin && req.headers.origin !== `http://${req.headers.host}`) throw new HttpError(403, 'Use the local studio origin.');
@@ -120,17 +132,30 @@ export function localProjectMiddleware(root: string, reveal = revealFolder, runn
       if (parts.length === 1 && req.method === 'GET') {
         if (await exists(base) && await realpath(base) !== base) throw new HttpError(400, 'Project root cannot redirect elsewhere.');
         const entries = await exists(base) ? await readdir(base, { withFileTypes: true }) : [];
-        const list = [];
+        const list: LocalProjectEntry[] = [];
+        const add = async (name: string, isSample = false) => {
+          try {
+            if (isSample && (!await exists(resolve(sample, 'source.png')) || !await exists(resolve(sample, 'built/base.png')))) return;
+            const value = await info(name); if (value) list.push(value);
+          } catch (error) {
+            if (error instanceof HttpError) return;
+            const relativePath = isSample ? 'samples/miko-qipao' : `projects/${name}`;
+            const failure = fileSystemError(root, error, relativePath);
+            if (!failure) throw error;
+            // A folder removed during the scan is no longer a project.
+            if (failure.body.code === 'ENOENT') return;
+            list.push({ name, relativePath, readOnly: isSample, error: { code: failure.body.code, path: failure.body.path } });
+          }
+        };
         for (const entry of entries) if (entry.isDirectory() && !entry.name.startsWith('.') && safeName.test(entry.name) && entry.name !== SAMPLE) {
-          try { const value = await info(entry.name); if (value) list.push(value); } catch (error) { if (!(error instanceof HttpError)) throw error; }
+          await add(entry.name);
         }
-        if (await exists(resolve(sample, 'source.png')) && await exists(resolve(sample, 'built/base.png'))) {
-          const value = await info(SAMPLE); if (value) list.push(value);
-        }
-        list.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+        await add(SAMPLE, true);
+        list.sort((a, b) => (b.error ? '' : b.updatedAt).localeCompare(a.error ? '' : a.updatedAt));
         json(200, list); return;
       }
       if (parts.length < 3) throw new HttpError(404, 'Not found.');
+      errorPath = parts[1] === SAMPLE ? 'samples/miko-qipao' : `projects/${parts[1]}`;
       const name = parts[1], path = await folder(name), tail = parts.slice(2);
       if (req.method === 'POST' && tail.length === 1 && tail[0] === 'reveal') {
         await reveal(path); json(200, { path }); return;
@@ -168,6 +193,8 @@ export function localProjectMiddleware(root: string, reveal = revealFolder, runn
       res.end(bytes);
     } catch (error) {
       if (error instanceof JobError) { json(422, { error: error.code, code: error.code, log: error.log }); return; }
+      const failure = fileSystemError(root, error, errorPath);
+      if (failure) { json(failure.status, failure.body); return; }
       const status = error instanceof HttpError ? error.status : (error as NodeJS.ErrnoException).code === 'ENOENT' ? 404 : 500;
       json(status, { error: error instanceof HttpError ? error.message : status === 404 ? 'Project or file not found.' : 'Local project operation failed.' });
     }
@@ -180,7 +207,11 @@ export function localProjectsPlugin(root: string): Plugin {
     if (!safeName.test(parts[0]) || parts[0].startsWith('.') || parts[0] === SAMPLE) return;
     if (parts[1] === 'variants' || (parts[1] === 'built' && parts[2] === 'sprites')) return parts[0];
   };
-  return { name: 'local-studio-projects', apply: 'serve', configureServer(server) {
+  return { name: 'local-studio-projects', apply: 'serve', config(config) {
+    if (config.server?.watch === null) return;
+    // Configure this before Vite starts watching the root, not only after add().
+    return { server: { watch: { ignored: [(file: string) => inside(base, file) && relative(base, file).split(sep).some(part => part.startsWith('.'))] } } };
+  }, configureServer(server) {
     server.middlewares.use(localProjectMiddleware(root));
     const timers = new Map<string, ReturnType<typeof setTimeout>>();
     const changed = (file: string) => {
@@ -192,6 +223,10 @@ export function localProjectsPlugin(root: string): Plugin {
         server.ws.send({ type: 'custom', event: 'studio:variants-changed', data: { name } });
       }, 800));
     };
+    server.watcher.on('error', error => {
+      const failure = fileSystemError(root, error);
+      server.config.logger.warn(`[local-studio-projects] Watch error: ${failure?.body.error ?? 'File watcher failed.'}`);
+    });
     server.watcher.add(base);
     server.watcher.on('all', (_event, file) => changed(file));
     server.httpServer?.once('close', () => { for (const timer of timers.values()) clearTimeout(timer); });

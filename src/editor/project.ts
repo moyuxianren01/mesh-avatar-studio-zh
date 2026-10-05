@@ -1,5 +1,8 @@
 import { parseRig } from '../rig/validate';
 import type { Rig } from '../rig/types';
+import type { LocalProject, LocalProjectEntry } from '../project-types';
+import { FolderOpenError } from './folder-errors';
+export type { LocalProject, LocalProjectEntry } from '../project-types';
 
 export interface ProjectAssets {
   sourceUrl: string;
@@ -11,39 +14,40 @@ export async function openProjectFolder(files: File[]): Promise<ProjectAssets> {
   const entries = files.map(file => ({ file, path: file.webkitRelativePath.replace(/^[^/]+\//, '') || file.name }));
   const source = entries.find(entry => /(^|\/)source\.png$/i.test(entry.path));
   const layers = entries.find(entry => /(^|\/)layers\.json$/i.test(entry.path));
-  if (!source || !layers) throw new Error('Choose a project folder containing source.png, layers.json and the cut-out images.');
+  if (!source || !layers) throw new FolderOpenError('missingFolderFiles', [!source ? 'source.png' : '', !layers ? 'layers.json' : ''].filter(Boolean));
+  const read = async (entry: typeof entries[number]) => {
+    try { return await entry.file.arrayBuffer(); }
+    catch { throw new FolderOpenError('unreadableFolder', [entry.path]); }
+  };
   const prefix = layers.path.slice(0, -'layers.json'.length);
   const rigFile = entries.find(entry => /(^|\/)rig\.json$/i.test(entry.path));
-  const rig = rigFile ? parseRig(JSON.parse(await rigFile.file.text())) : undefined;
-  const metadata = JSON.parse(await layers.file.text()) as { layers?: Record<string, unknown> };
+  const rig = rigFile ? parseRig(JSON.parse(new TextDecoder().decode(await read(rigFile)))) : undefined;
+  const layerBytes = await read(layers);
+  const metadata = JSON.parse(new TextDecoder().decode(layerBytes)) as { layers?: Record<string, unknown> };
   if (!metadata.layers || typeof metadata.layers !== 'object') throw new Error('layers.json must contain layer rectangles.');
   const available = new Set(entries.filter(entry => entry.path.startsWith(prefix)).map(entry => entry.path.slice(prefix.length)));
   const required = ['base.png', 'hairmask.png', ...Object.keys(metadata.layers).map(name => `${name}.png`)];
   const missing = required.filter(name => !available.has(name));
-  if (missing.length) throw new Error(`Missing image files: ${missing.join(', ')}`);
+  if (missing.length) throw new FolderOpenError('missingFolderFiles', missing.map(name => `${prefix}${name}`));
+  // Reading the bytes catches locked files before replacing the current project.
+  // Object URLs alone do not read a File and defer failures to the preview.
+  const sourceBytes = await read(source);
+  const built = [];
+  for (const entry of entries.filter(entry => entry.path.startsWith(prefix))) {
+    built.push({ entry, bytes: entry === layers ? layerBytes : await read(entry) });
+  }
   const urls: string[] = [];
-  const sourceUrl = URL.createObjectURL(source.file);
+  const sourceUrl = URL.createObjectURL(new Blob([sourceBytes], { type: source.file.type }));
   urls.push(sourceUrl);
-  const assets = Object.fromEntries(entries.filter(entry => entry.path.startsWith(prefix)).map(entry => {
-    const url = URL.createObjectURL(entry.file);
+  const assets = Object.fromEntries(built.map(({ entry, bytes }) => {
+    const url = URL.createObjectURL(new Blob([bytes], { type: entry.file.type }));
     urls.push(url);
     return [entry.path.slice(prefix.length), url];
   }));
   return { sourceUrl, assets, rig, urls };
 }
 
-export interface LocalProject {
-  name: string;
-  relativePath: string;
-  absolutePath: string;
-  displayPath?: string;
-  updatedAt: string;
-  hasSprites: boolean;
-  hasVariants: boolean;
-  readOnly: boolean;
-  rigFile?: 'rig.json' | 'rig.draft.json';
-}
-export async function localProjects(): Promise<LocalProject[] | null> {
+export async function localProjects(): Promise<LocalProjectEntry[] | null> {
   if (!import.meta.env.DEV) return null;
   try {
     const response = await fetch('/__studio/projects');
