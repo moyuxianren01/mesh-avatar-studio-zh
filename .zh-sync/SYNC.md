@@ -19,6 +19,9 @@
    - 冲突极大概率出现在 `src/editor/workflow-i18n.ts`（上游改了 `workflowJa`，我们改名为 `workflowZh`）
      和 `src/editor/i18n.tsx`（`ja`→`zh`）。解决原则：**接受上游的日文新内容，翻译后写入对应的 `zh` 位置**，
      不要丢弃上游的功能改动，也不要把日文残留进 `zh`。
+   - 特殊文件 `src/editor/i18n-zh.ts`（上游 2026-10-05 的官方中文支持，fork 于同日永久删除——与 ja→zh
+     整替架构不兼容，fork 内无人引用）：若合并报 deleted-by-us / modified-by-them 冲突，一律
+     `git rm src/editor/i18n-zh.ts` 保留删除，不要恢复该文件。
 4. 找出所有新增/变更的日文字符串：
    `git diff <merge-base> upstream/main -- src/editor/workflow-i18n.ts src/editor/i18n.tsx`
    只看 `ja` / `workflowJa` / `partText.ja` / `fieldText` 第二元、`mouthKinds` 等日文侧的 `+` 行；
@@ -26,6 +29,8 @@
    - 上游新增 key（`zh: typeof en` 会报 tsc 缺 key，正好当检查用）：补上中文翻译
    - 上游删除 key：同步删除 `zh` 对应 key
    - 上游改了英文 key 名：`zh` 跟着改名
+   - 上游新增 UI 字符串时，先 `git show upstream/main:src/editor/i18n-zh.ts` 查上游有无官方中文措辞——
+     有则优先采用（与官方保持一致，省翻译量）；无则按术语表自行翻译日文。
    - e2e / tests 里若有日文断言字符串被上游改动，同步更新为中文断言
 5. 验证门槛（必须全过才允许推送）：
    - `npx tsc --noEmit`
